@@ -12,7 +12,7 @@
 > sudo systemctl enable служба
 >
 > # Убрать службу из автозагрузки
-sudo systemctl disable служба
+> sudo systemctl disable служба
 >
 > # Включить службу, если она выключена
 > sudo systemctl start служба
@@ -111,8 +111,8 @@ After=postgresql.service
 [Unit]
 Description=Сервис, которому желательно иметь доступ в Интернет, но не критично
 
-Wants=postgresql.service
-After=postgresql.service
+Wants=network-online.target
+After=network-online.target
 ```
 
 (Чтобы этот лайфхак сработал, надо чтобы нужный сервис был прописан и в `BindsTo / Requires / Wants` и в `After`)
@@ -172,7 +172,11 @@ After=postgresql.service
 
 🌿 Устанавливает директорию, в которой хранятся файлы нашего сервиса
 
-📓 Пример: `WorkingDirectory=/home/user/projects/my_bot`
+❗ Важно: лучшей практикой считается класть файлы проекта не в `/home/user`, а в специально отведённый для таких случаях каталог `/opt`
+
+🌐 Интересный факт: `/opt` так и расшифровывается: *optional* — дополнительное, стороннее, не встроенное в систему по умолчанию ПО. Как Вы понимаете, наши проекты идеально подходят для данного каталога
+
+📓 Пример: `WorkingDirectory=/opt/my_bot`
 
 #### Параметр ExecStart
 
@@ -185,6 +189,20 @@ After=postgresql.service
 👨 От какого пользователя запускать сервис. Не ставьте `root`, пожалуйста
 
 📓 Пример: `User=some_user`
+
+> [!TIP]- Как создать отдельного, изолированного пользователя для запуска сервисов?
+> Для создания отдельного, изолированного пользователя необходимо выполнить данную команду (от `root`):
+>
+> ```sh
+> useradd ИМЯ --shell /usr/sbin/nologin --no-create-home --user-group --system
+> ```
+>
+> Разберём флаги:
+>
+> 1. `--shell /usr/sbin/nologin`: полностью отключает возможность залогиниться в этого пользователя (будь то по SSH или даже локально). Повышает защиту от взлома
+> 2. `--no-create-home`: не создавать домашнюю папку (`/home/ИМЯ`). Как мы уже знаем, класть файлы проекта рекомендуется в специально отведённый каталог `/opt`. Раз мы туда кладём файлы, зачем нам лишний мусор в лице `/home/ИМЯ`? К тому же это создаёт некоторую поверхность для атак. Если хакер взломает нашего пользователя, у него будет чуть больше места "разгуляться"
+> 3. `--user-group`: также помимо пользователя создать и одноимённую группу вместо присоединения к `nogroup`
+> 4. `--system`: сказать системе: "я создаю этого пользователя для сервиса, а не для человека. Отключи все плюшки и красоту". Кстати, `--system` также отключает и создание домашней директории, но я всё равно рекомендую `--no-create-home`, т.к. в специфичных / старых / некорректно настроенных системах если его не указать, может создаться домашняя папка
 
 #### Параметр Group
 
@@ -212,13 +230,13 @@ After=postgresql.service
 
 #### Параметр ExecStartPost
 
-➡️ Команда, которую нужно после команды из `ExecStart`:
+➡️ Команда, которую нужно выполнить после команды из `ExecStart`:
 
 📓 Пример: `ExecStartPost=/usr/bin/python3 post_starting_script.py`
 
 #### Параметр ExecStopPost
 
-➡️ Команда, которую нужно после команды из `ExecStop`:
+➡️ Команда, которую нужно выполнить после команды из `ExecStop`:
 
 📓 Пример: `ExecStopPost=/usr/bin/python3 post_cleaning.py`
 
@@ -245,7 +263,7 @@ After=postgresql.service
 
 1. `journal` (по умолчанию) — в `journalctl`
 2. `file:/path/to/log.file` — при каждом перезапуске очищать указанный файл и начинать запись логов с чистого листа
-3. `append:/path/to/log.file` — при перезапуске ничего не очищать, просто продолжать **дописывать** логи в этот файла (отсюда и название `append`)
+3. `append:/path/to/log.file` — при перезапуске ничего не очищать, просто продолжать **дописывать** логи в этот файл (отсюда и название `append`)
 4. `null` — не логировать
 
 📓 Пример: `StandardOutput=journal`
@@ -264,7 +282,7 @@ sudo journalctl -u name.service --no-pager # Сразу вывалить в те
 
 1. `journal` (по умолчанию) — в `journalctl`
 2. `file:/path/to/log.file` — при каждом перезапуске очищать указанный файл и начинать запись логов с чистого листа
-3. `append:/path/to/log.file` — при перезапуске ничего не очищать, просто продолжать **дописывать** логи в этот файла (отсюда и название `append`)
+3. `append:/path/to/log.file` — при перезапуске ничего не очищать, просто продолжать **дописывать** логи в этот файл (отсюда и название `append`)
 4. `null` — не логировать
 
 📓 Пример: `StandardError=journal`
@@ -281,7 +299,7 @@ sudo journalctl -u name.service --no-pager # Сразу вывалить в те
 
 🤫 Указывает путь к файлу `.env`. После этого все переменные подтянутся и можно ими пользоваться без необходимости делать `dotenv.load_dotenv()`
 
-📓 Пример: `EnvironmentFile=/home/user/projects/my_bot/.env`
+📓 Пример: `EnvironmentFile=/opt/my_bot/.env`
 
 #### Параметр Environment
 
@@ -399,11 +417,11 @@ sudo journalctl -u name.service --no-pager # Сразу вывалить в те
 
 #### Параметр ProtectHome
 
-🛡️ Запретить, перевести в режим только чтения или разрешить манипуляции с каталогами `/home` и `/root` для процессов
+🛡️ Запретить, перевести в режим только чтения или разрешить манипуляции с каталогами `/home`, `/root` и `/run/user` для процессов
 
-1. `yes` — каталоги `/home` и `/root` полностью недоступны
-2. `read-only` — каталоги `/home` и `/root` доступны только для чтения
-3. `no` — каталоги `/home` и `/root` не защищены (по умолчанию). Если есть параметр `ProtectSystem=strict`, то он перекрывает `ProtectHome=no`. Для разрешения писать в `/home` редактировать `ReadWritePaths`
+1. `yes` — каталоги `/home`, `/root` и `/run/user` полностью недоступны
+2. `read-only` — каталоги `/home`, `/root` и `/run/user` доступны только для чтения
+3. `no` — каталоги `/home`, `/root` и `/run/user` не защищены (по умолчанию). Если есть параметр `ProtectSystem=strict`, то он перекрывает `ProtectHome=no`. Для разрешения писать в `/home` редактировать `ReadWritePaths`
 
 #### Параметр ProtectKernelTunables
 
@@ -553,8 +571,8 @@ User=user
 Group=user
 
 # Указываем директорию, команды запуска
-WorkingDirectory=/home/user/bots/cool_bot
-ExecStart=/home/user/bots/cool_bot/venv/bin/python3 main.py
+WorkingDirectory=/opt/cool_bot
+ExecStart=/opt/cool_bot/venv/bin/python3 main.py
 
 # Если бот упал - поднимаем, если завершился штатно (пример через команду /stop) - не поднимаем. Также поставим задержку, чтобы не злить Telegram API
 Restart=on-failure
@@ -579,9 +597,10 @@ ProtectControlGroups=strict
 LockPersonality=yes
 InaccessiblePaths=/dev/shm
 
-# Запрещаем всё, кроме /dev, /proc, /sys и /home/user/bots/cool_bot
+# Запрещаем всё, кроме /dev, /proc, /sys и /opt/cool_bot
 ProtectSystem=strict
-ReadWritePaths=/home/user/bots/cool_bot
+ProtectHome=yes
+ReadWritePaths=/opt/cool_bot
 
 [Install]
 WantedBy=multi-user.target
